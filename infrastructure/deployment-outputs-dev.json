@@ -1,0 +1,50 @@
+{
+  "appInsightsName": {
+    "type": "String",
+    "value": "ats-app-dev-insights"
+  },
+  "keyVaultName": {
+    "type": "String",
+    "value": "ats-appdevkvbkq2fyfmkaks"
+  },
+  "resourceGroupLocation": {
+    "type": "String",
+    "value": "eastus2"
+  },
+  "searchServiceEndpoint": {
+    "type": "String",
+    "value": "https://ats-app-dev-search.search.windows.net"
+  },
+  "searchServiceName": {
+    "type": "String",
+    "value": "ats-app-dev-search"
+  },
+  "sqlConnectionStringTemplate": {
+    "type": "String",
+    "value": "Server=tcp:ats-app-dev-sql-server.database.windows.net,1433;Initial Catalog=ats-app-dev-database;Persist Security Info=False;User ID=sqladmin;Password=<SQL_PASSWORD>;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
+  },
+  "sqlDatabaseName": {
+    "type": "String",
+    "value": "ats-app-dev-database"
+  },
+  "sqlServerName": {
+    "type": "String",
+    "value": "ats-app-dev-sql-server"
+  },
+  "staticWebAppName": {
+    "type": "String",
+    "value": "ats-app-dev-webapp"
+  },
+  "staticWebAppUrl": {
+    "type": "String",
+    "value": "green-glacier-016b07a0f.2.azurestaticapps.net"
+  },
+  "storageAccountName": {
+    "type": "String",
+    "value": "atsappdevstbkq2fyfmkaksq"
+  },
+  "storageConnectionStringTemplate": {
+    "type": "String",
+    "value": "DefaultEndpointsProtocol=https;AccountName=atsappdevstbkq2fyfmkaksq;AccountKey=<STORAGE_KEY>;EndpointSuffix=core.windows.net"
+  }
+}
