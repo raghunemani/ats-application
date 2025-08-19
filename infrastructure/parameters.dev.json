@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appName": {
+      "value": "ats-app"
+    },
+    "environment": {
+      "value": "dev"
+    },
+    "sqlDatabaseSku": {
+      "value": "Basic"
+    },
+    "searchServiceTier": {
+      "value": "basic"
+    },
+    "sqlAdminPassword": {
+      "value": "DevPassword123!"
+    }
+  }
+}
