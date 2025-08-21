@@ -30,11 +30,5 @@
     "@types/jest": "^29.5.8",
     "ts-jest": "^29.1.1",
     "azure-functions-core-tools": "^4.0.5455"
-  },
-  "jest": {
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "roots": ["<rootDir>/src"],
-    "testMatch": ["**/__tests__/**/*.ts", "**/?(*.)+(spec|test).ts"]
   }
 }

@@ -11,7 +11,15 @@
   - Configure Azure resource deployment templates (ARM/Bicep)
   - _Requirements: 4.1, 4.3_
 
-- [ ] 2. Implement core data models and database schema
+- [x] 2. Implement core data models and database schema
+
+
+
+
+
+
+
+
   - Create TypeScript interfaces for Candidate, JobDescription, and EmailCampaign models
   - Write Azure SQL Database schema creation scripts
   - Implement database connection utilities and configuration
