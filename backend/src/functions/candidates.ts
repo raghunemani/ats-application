@@ -54,7 +54,7 @@ export async function getCandidates(request: HttpRequest, context: InvocationCon
             }
         };
     } catch (error) {
-        context.log.error('Error getting candidates:', error);
+        context.log('Error getting candidates:', error);
         return {
             status: 500,
             jsonBody: { error: 'Failed to get candidates' }
@@ -105,7 +105,7 @@ export async function createCandidate(request: HttpRequest, context: InvocationC
             jsonBody: candidate
         };
     } catch (error) {
-        context.log.error('Error creating candidate:', error);
+        context.log('Error creating candidate:', error);
         return {
             status: 500,
             jsonBody: { error: 'Failed to create candidate' }
@@ -164,7 +164,7 @@ export async function updateCandidate(request: HttpRequest, context: InvocationC
             jsonBody: updatedCandidate
         };
     } catch (error) {
-        context.log.error('Error updating candidate:', error);
+        context.log('Error updating candidate:', error);
         return {
             status: 500,
             jsonBody: { error: 'Failed to update candidate' }
@@ -184,13 +184,26 @@ export async function deleteCandidate(request: HttpRequest, context: InvocationC
         await blockBlobClient.delete();
 
         // Delete from search index
-        await searchClient.deleteDocuments([{ candidateId: id }]);
+        await searchClient.deleteDocuments([{ 
+            candidateId: id,
+            name: '',
+            email: '',
+            phone: '',
+            visaStatus: '',
+            availability: '',
+            skills: [],
+            location: '',
+            experienceSummary: '',
+            resumeContent: '',
+            createdAt: '',
+            updatedAt: ''
+        }]);
 
         return {
             status: 204
         };
     } catch (error) {
-        context.log.error('Error deleting candidate:', error);
+        context.log('Error deleting candidate:', error);
         return {
             status: 500,
             jsonBody: { error: 'Failed to delete candidate' }
