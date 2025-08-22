@@ -26,14 +26,17 @@
   - Create unit tests for data model validation
   - _Requirements: 1.1, 1.2, 5.1, 5.2_
 
-- [ ] 3. Build candidate management backend API
+- [x] 3. Build candidate management backend API
+
   - Implement Azure Functions for candidate CRUD operations (/api/candidates)
   - Create candidate data access layer with Azure SQL integration
   - Add file upload handling for resume storage in Azure Blob Storage
   - Write unit tests for candidate API endpoints
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 4. Implement Azure AI Search integration
+- [x] 4. Implement Azure AI Search integration
+
+
   - Set up Azure AI Search service configuration and index schema
   - Create search indexing functions to populate candidate data
   - Implement candidate search API with job description matching (/api/search)

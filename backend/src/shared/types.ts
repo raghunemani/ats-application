@@ -1,65 +1,62 @@
 // Core data models for the Application Tracking System
+// Optimized for Blob Storage + Azure AI Search architecture
 
 /**
- * Candidate interface - represents a job candidate in the IT staffing system
- * Stores comprehensive candidate information including personal details, 
- * skills, experience, and availability status
+ * Candidate interface - represents a job candidate stored in Blob Storage
+ * Simplified structure for blob-based storage with metadata
  */
 export interface Candidate {
   id: string;
   name: string;
   email: string;
   phone: string;
-  resumeUrl: string;
+  resumeUrl?: string;
+  resumeFileName?: string;
   experienceSummary: string;
   visaStatus: 'Citizen' | 'GreenCard' | 'H1B' | 'F1OPT' | 'RequiresSponsorship';
   availability: 'Immediate' | 'TwoWeeks' | 'OneMonth' | 'NotAvailable';
   skills: string[];
-  experience: Experience[];
-  education: Education[];
   location: string;
-  salaryExpectation?: number;
-  linkedInUrl?: string;
-  githubUrl?: string;
-  portfolioUrl?: string;
   notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string; // ISO string for JSON serialization
+  updatedAt: string; // ISO string for JSON serialization
 }
 
 /**
- * Experience interface - represents work experience for a candidate
+ * CandidateSearchDocument - represents a candidate document in Azure AI Search
+ * Optimized for search operations with flattened data structure
  */
-export interface Experience {
-  id: string;
-  company: string;
-  title: string;
-  startDate: Date;
-  endDate?: Date; // null if current position
-  duration: string; // e.g., "2 years 3 months"
-  description: string;
-  technologies: string[];
-  achievements?: string[];
+export interface CandidateSearchDocument {
+  candidateId: string; // Primary key for search index
+  name: string;
+  email: string;
+  phone: string;
+  visaStatus: string;
+  availability: string;
+  skills: string[]; // Searchable array
+  location: string;
+  experienceSummary: string;
+  resumeFileName?: string;
+  resumeContent: string; // Extracted text content from resume for search
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
- * Education interface - represents educational background for a candidate
+ * BlobMetadata - represents metadata stored with candidate blobs
  */
-export interface Education {
-  id: string;
-  institution: string;
-  degree: string;
-  fieldOfStudy: string;
-  startDate: Date;
-  endDate?: Date;
-  gpa?: number;
-  achievements?: string[];
+export interface BlobMetadata {
+  candidateId: string;
+  candidateName: string;
+  originalFileName?: string;
+  uploadedAt: string;
+  fileType?: string;
+  fileSize?: number;
 }
 
 /**
  * JobDescription interface - represents client job requirements
- * For IT staffing, this contains the job details from clients
- * Note: No salary range as this is client requirements, not what we pay candidates
+ * Simplified for search-based matching
  */
 export interface JobDescription {
   id: string;
@@ -68,48 +65,44 @@ export interface JobDescription {
   requirements: string[];
   preferredSkills: string[];
   location: string;
-  workType: 'Remote' | 'Hybrid' | 'OnSite';
-  employmentType: 'FullTime' | 'PartTime' | 'Contract' | 'Internship';
-  visaRequirement: string; // What visa status is acceptable for this role
+  visaRequirement: string;
   experienceLevel: 'Entry' | 'Mid' | 'Senior' | 'Lead' | 'Executive';
-  department: string;
-  clientName: string; // IT Staffing - which client this job is for
-  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  clientName: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
- * EmailCampaign interface - represents an email outreach campaign
- * Used to send personalized emails to selected candidates about job opportunities
+ * SearchQuery - represents a search request for candidates
  */
-export interface EmailCampaign {
-  id: string;
-  name: string;
-  description?: string;
-  jobDescriptionId: string;
-  candidateIds: string[];
-  emailTemplate: string;
-  subject: string;
-  status: 'Draft' | 'Sent' | 'Scheduled' | 'Failed';
-  scheduledAt?: Date;
-  sentAt?: Date;
-  createdBy: string; // User who created the campaign
-  analytics: CampaignAnalytics;
-  createdAt: Date;
-  updatedAt: Date;
+export interface SearchQuery {
+  jobDescription: string;
+  requiredSkills?: string[];
+  preferredSkills?: string[];
+  visaStatus?: string[];
+  availability?: string[];
+  location?: string;
+  experienceLevel?: string;
 }
 
 /**
- * CampaignAnalytics interface - tracks email campaign performance metrics
+ * SearchResult - represents search results from Azure AI Search
  */
-export interface CampaignAnalytics {
-  totalSent: number;
-  delivered: number;
-  opened: number;
-  clicked: number;
-  replied: number;
+export interface SearchResult {
+  candidates: CandidateSearchResult[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+/**
+ * CandidateSearchResult - represents a candidate in search results with relevance score
+ */
+export interface CandidateSearchResult extends Candidate {
+  relevanceScore: number;
+  matchingSkills: string[];
+  highlightedText?: string;
 }
 
 // API Response types
@@ -132,30 +125,31 @@ export interface ErrorResponse {
   };
 }
 
-// Database entity base interface
+// Base entity interface for blob-stored entities
 export interface BaseEntity {
   id: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string; // ISO string
+  updatedAt: string; // ISO string
 }
 
-// Search and filtering types
-export interface SearchFilters {
-  skills?: string[];
-  visaStatus?: string[];
-  availability?: string[];
-  location?: string;
-  experienceLevel?: string[];
-  salaryRange?: {
-    min?: number;
-    max?: number;
-  };
+// Azure AI Search configuration
+export interface SearchConfig {
+  endpoint: string;
+  apiKey: string;
+  indexName: string;
 }
 
-export interface SearchResult<T> {
-  items: T[];
-  totalCount: number;
-  page: number;
-  pageSize: number;
-  hasMore: boolean;
+// Blob Storage configuration
+export interface BlobConfig {
+  connectionString: string;
+  containerName: string;
+}
+
+// File upload types
+export interface FileUploadResult {
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  blobUrl: string;
+  uploadedAt: string;
 }

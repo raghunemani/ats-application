@@ -2,11 +2,34 @@
 
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { BlobServiceClient } from '@azure/storage-blob';
-import { executeQuery, executeQuerySingle, initializeDatabase } from '../database/config';
+import { SearchClient, AzureKeyCredential } from '@azure/search-documents';
+
+// Helper functions for Azure services
+const getBlobServiceClient = (): BlobServiceClient => {
+    const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
+    if (!connectionString) {
+        throw new Error('AZURE_STORAGE_CONNECTION_STRING environment variable is required');
+    }
+    return BlobServiceClient.fromConnectionString(connectionString);
+};
+
+const getSearchClient = (): SearchClient<any> => {
+    const endpoint = process.env.AZURE_SEARCH_ENDPOINT;
+    const apiKey = process.env.AZURE_SEARCH_API_KEY;
+    const indexName = process.env.AZURE_SEARCH_INDEX_NAME || 'candidates-index';
+    
+    if (!endpoint || !apiKey) {
+        throw new Error('AZURE_SEARCH_ENDPOINT and AZURE_SEARCH_API_KEY environment variables are required');
+    }
+    
+    return new SearchClient(endpoint, indexName, new AzureKeyCredential(apiKey));
+};
+
+const CANDIDATES_CONTAINER = 'candidates';
 
 /**
  * POST /api/candidates/{id}/resume
- * Uploads a resume file to Azure Blob Storage and updates the candidate record
+ * Uploads a resume file to Azure Blob Storage and updates the candidate metadata
  */
 export async function uploadResume(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     context.log('Uploading resume file');
@@ -26,24 +49,31 @@ export async function uploadResume(request: HttpRequest, context: InvocationCont
             };
         }
 
-        // Step 2: Initialize database and check if candidate exists
-        await initializeDatabase();
+        // Step 2: Check if candidate exists in Blob Storage
+        const blobServiceClient = getBlobServiceClient();
+        const containerClient = blobServiceClient.getContainerClient(CANDIDATES_CONTAINER);
         
-        const existingCandidate = await executeQuerySingle<any>(
-            'SELECT Id, Name, Email FROM Candidates WHERE Id = @candidateId',
-            { candidateId }
-        );
-
-        if (!existingCandidate) {
-            return {
-                status: 404,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    success: false,
-                    error: { code: 'CANDIDATE_NOT_FOUND', message: `Candidate with ID ${candidateId} not found` },
-                    timestamp: new Date().toISOString()
-                })
-            };
+        const metadataBlobName = `${candidateId}/metadata.json`;
+        const metadataBlobClient = containerClient.getBlobClient(metadataBlobName);
+        
+        let existingCandidate: any;
+        try {
+            const downloadResponse = await metadataBlobClient.download();
+            const metadataContent = await streamToString(downloadResponse.readableStreamBody!);
+            existingCandidate = JSON.parse(metadataContent);
+        } catch (blobError: any) {
+            if (blobError.statusCode === 404) {
+                return {
+                    status: 404,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        success: false,
+                        error: { code: 'CANDIDATE_NOT_FOUND', message: `Candidate with ID ${candidateId} not found` },
+                        timestamp: new Date().toISOString()
+                    })
+                };
+            }
+            throw blobError;
         }
 
         // Step 3: Get the file from the request
@@ -102,70 +132,65 @@ export async function uploadResume(request: HttpRequest, context: InvocationCont
             };
         }
 
-        // Step 5: Set up Azure Blob Storage connection
-        const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
-        if (!connectionString) {
-            context.log('Azure Storage connection string not configured');
-            return {
-                status: 500,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    success: false,
-                    error: { code: 'STORAGE_NOT_CONFIGURED', message: 'File storage is not properly configured' },
-                    timestamp: new Date().toISOString()
-                })
-            };
-        }
-
-        const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
-        const containerName = 'resumes';
-        const containerClient = blobServiceClient.getContainerClient(containerName);
-
-        // Step 6: Create container if it doesn't exist
-        await containerClient.createIfNotExists({
-            access: 'blob' // Public read access for resumes
-        });
-
-        // Step 7: Generate unique filename
+        // Step 5: Generate unique filename and upload to blob storage
         const fileExtension = getFileExtension(file.name);
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const sanitizedCandidateName = existingCandidate.Name.replace(/[^a-zA-Z0-9]/g, '-');
-        const blobName = `${candidateId}/${sanitizedCandidateName}-${timestamp}${fileExtension}`;
+        const sanitizedCandidateName = existingCandidate.name.replace(/[^a-zA-Z0-9]/g, '-');
+        const resumeBlobName = `${candidateId}/resume-${timestamp}${fileExtension}`;
 
-        // Step 8: Upload file to blob storage
-        const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+        // Step 6: Upload file to blob storage
+        const resumeBlobClient = containerClient.getBlockBlobClient(resumeBlobName);
         
         // Convert File to ArrayBuffer for upload
         const fileBuffer = await file.arrayBuffer();
-        const uploadResponse = await blockBlobClient.uploadData(fileBuffer, {
+        await resumeBlobClient.uploadData(fileBuffer, {
             blobHTTPHeaders: {
                 blobContentType: file.type
             },
             metadata: {
                 candidateId: candidateId,
-                candidateName: existingCandidate.Name,
+                candidateName: existingCandidate.name,
                 originalFileName: file.name,
                 uploadedAt: new Date().toISOString()
             }
         });
 
-        // Step 9: Get the public URL of the uploaded file
-        const resumeUrl = blockBlobClient.url;
+        // Step 7: Get the resume URL
+        const resumeUrl = resumeBlobClient.url;
 
-        // Step 10: Update candidate record with new resume URL
-        const updateQuery = `
-            UPDATE Candidates 
-            SET ResumeUrl = @resumeUrl, UpdatedAt = @updatedAt
-            WHERE Id = @candidateId
-        `;
+        // Step 8: Update candidate metadata with resume information
+        existingCandidate.resumeFileName = file.name;
+        existingCandidate.resumeUrl = resumeUrl;
+        existingCandidate.updatedAt = new Date().toISOString();
 
-        await executeQuery(updateQuery, {
-            resumeUrl: resumeUrl,
-            updatedAt: new Date(),
-            candidateId: candidateId
-        });
+        // Save updated metadata back to blob storage
+        const updatedMetadataBlob = containerClient.getBlockBlobClient(metadataBlobName);
+        await updatedMetadataBlob.upload(
+            JSON.stringify(existingCandidate, null, 2), 
+            JSON.stringify(existingCandidate).length,
+            { blobHTTPHeaders: { blobContentType: 'application/json' } }
+        );
 
-        // Step 11: Return success response
+        // Step 9: Update Azure AI Search index with resume information
+        try {
+            const searchClient = getSearchClient();
+            
+            // TODO: Extract text content from resume file for search indexing
+            // For now, we'll just update the resume filename
+            const searchDocument = {
+                candidateId: candidateId,
+                resumeFileName: file.name,
+                resumeContent: '', // Will be populated by AI text extraction later
+                updatedAt: existingCandidate.updatedAt
+            };
+
+            await searchClient.mergeOrUploadDocuments([searchDocument]);
+        } catch (searchError) {
+            context.log('Warning: Failed to update search index:', searchError);
+            // Continue execution - search index update is not critical for file upload
+        }
+
+        // Step 10: Return success response
         return {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
@@ -173,7 +198,7 @@ export async function uploadResume(request: HttpRequest, context: InvocationCont
                 success: true,
                 data: {
                     candidateId: candidateId,
-                    candidateName: existingCandidate.Name,
+                    candidateName: existingCandidate.name,
                     resumeUrl: resumeUrl,
                     fileName: file.name,
                     fileSize: file.size,
@@ -217,7 +242,7 @@ function getFileExtension(filename: string): string {
 
 /**
  * GET /api/candidates/{id}/resume
- * Gets the resume download URL for a candidate
+ * Gets the resume download URL for a candidate from Blob Storage
  */
 export async function getResumeUrl(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     context.log('Getting resume URL');
@@ -237,27 +262,34 @@ export async function getResumeUrl(request: HttpRequest, context: InvocationCont
             };
         }
 
-        // Step 2: Get candidate and resume URL from database
-        await initializeDatabase();
+        // Step 2: Get candidate metadata from Blob Storage
+        const blobServiceClient = getBlobServiceClient();
+        const containerClient = blobServiceClient.getContainerClient(CANDIDATES_CONTAINER);
         
-        const candidate = await executeQuerySingle<any>(
-            'SELECT Id, Name, Email, ResumeUrl FROM Candidates WHERE Id = @candidateId',
-            { candidateId }
-        );
-
-        if (!candidate) {
-            return {
-                status: 404,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    success: false,
-                    error: { code: 'CANDIDATE_NOT_FOUND', message: `Candidate with ID ${candidateId} not found` },
-                    timestamp: new Date().toISOString()
-                })
-            };
+        const metadataBlobName = `${candidateId}/metadata.json`;
+        const metadataBlobClient = containerClient.getBlobClient(metadataBlobName);
+        
+        let candidate: any;
+        try {
+            const downloadResponse = await metadataBlobClient.download();
+            const metadataContent = await streamToString(downloadResponse.readableStreamBody!);
+            candidate = JSON.parse(metadataContent);
+        } catch (blobError: any) {
+            if (blobError.statusCode === 404) {
+                return {
+                    status: 404,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        success: false,
+                        error: { code: 'CANDIDATE_NOT_FOUND', message: `Candidate with ID ${candidateId} not found` },
+                        timestamp: new Date().toISOString()
+                    })
+                };
+            }
+            throw blobError;
         }
 
-        if (!candidate.ResumeUrl) {
+        if (!candidate.resumeUrl) {
             return {
                 status: 404,
                 headers: { 'Content-Type': 'application/json' },
@@ -276,9 +308,10 @@ export async function getResumeUrl(request: HttpRequest, context: InvocationCont
             body: JSON.stringify({
                 success: true,
                 data: {
-                    candidateId: candidate.Id,
-                    candidateName: candidate.Name,
-                    resumeUrl: candidate.ResumeUrl
+                    candidateId: candidate.id,
+                    candidateName: candidate.name,
+                    resumeUrl: candidate.resumeUrl,
+                    resumeFileName: candidate.resumeFileName
                 },
                 timestamp: new Date().toISOString()
             })
@@ -293,7 +326,7 @@ export async function getResumeUrl(request: HttpRequest, context: InvocationCont
             body: JSON.stringify({
                 success: false,
                 error: {
-                    code: 'DATABASE_ERROR',
+                    code: 'BLOB_ERROR',
                     message: 'Failed to get resume URL',
                     details: error instanceof Error ? error.message : 'Unknown error'
                 },
@@ -301,6 +334,20 @@ export async function getResumeUrl(request: HttpRequest, context: InvocationCont
             })
         };
     }
+}
+
+// Helper function to convert stream to string
+async function streamToString(readableStream: NodeJS.ReadableStream): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        readableStream.on('data', (data) => {
+            chunks.push(data instanceof Buffer ? data : Buffer.from(data));
+        });
+        readableStream.on('end', () => {
+            resolve(Buffer.concat(chunks).toString());
+        });
+        readableStream.on('error', reject);
+    });
 }
 
 // Register the functions with Azure Functions runtime
