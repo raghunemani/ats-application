@@ -458,7 +458,7 @@ function generateSearchInsights(trends: any): string[] {
     
     // Query complexity distribution
     const complexQueries = trends.queryComplexityTrend.complex || 0;
-    const totalQueries = Object.values(trends.queryComplexityTrend).reduce((sum: number, count) => sum + (count as number), 0);
+    const totalQueries = Object.values(trends.queryComplexityTrend as Record<string, number>).reduce((sum: number, count: number) => sum + count, 0);
     if (totalQueries > 0) {
         const complexPercentage = Math.round((complexQueries / totalQueries) * 100);
         insights.push(`${complexPercentage}% of searches use complex queries with filters`);

@@ -13,21 +13,21 @@
   },
   "dependencies": {
     "@azure/functions": "^4.0.0",
-    "@azure/storage-blob": "^12.17.0",
-    "@azure/search-documents": "^12.0.0",
     "@azure/openai": "^1.0.0-beta.8",
+    "@azure/search-documents": "^12.0.0",
+    "@azure/storage-blob": "^12.17.0",
     "joi": "^17.11.0",
-    "uuid": "^9.0.1",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.8",
+    "@types/multer": "^1.4.11",
     "@types/node": "^20.0.0",
     "@types/uuid": "^9.0.7",
-    "@types/multer": "^1.4.11",
-    "typescript": "^5.2.2",
+    "azure-functions-core-tools": "^4.0.5455",
     "jest": "^29.7.0",
-    "@types/jest": "^29.5.8",
     "ts-jest": "^29.1.1",
-    "azure-functions-core-tools": "^4.0.5455"
+    "typescript": "^5.2.2"
   }
 }

@@ -42,9 +42,15 @@ export async function semanticCandidateSearch(request: HttpRequest, context: Inv
         // Perform semantic search
         const searchOptions = {
             queryType: 'semantic' as const,
-            semanticConfiguration: 'candidate-semantic-config',
-            queryCaption: 'extractive',
-            queryAnswer: 'extractive',
+            semanticSearchOptions: {
+                configurationName: 'candidate-semantic-config',
+                captions: {
+                    captionType: 'extractive' as const
+                },
+                answers: {
+                    answerType: 'extractive' as const
+                }
+            },
             top: top,
             skip: skip,
             includeTotalCount: true,
@@ -164,8 +170,12 @@ export async function intelligentJobMatching(request: HttpRequest, context: Invo
         // Perform semantic search with job context
         const searchOptions = {
             queryType: 'semantic' as const,
-            semanticConfiguration: 'candidate-semantic-config',
-            queryCaption: 'extractive',
+            semanticSearchOptions: {
+                configurationName: 'candidate-semantic-config',
+                captions: {
+                    captionType: 'extractive' as const
+                }
+            },
             top: requestBody.maxResults || 20,
             includeTotalCount: true,
             filter: filters.length > 0 ? filters.join(' and ') : undefined,
@@ -282,7 +292,9 @@ export async function naturalLanguageSearch(request: HttpRequest, context: Invoc
         // Perform search with enhanced query
         const searchOptions = {
             queryType: 'semantic' as const,
-            semanticConfiguration: 'candidate-semantic-config',
+            semanticSearchOptions: {
+                configurationName: 'candidate-semantic-config'
+            },
             top: 20,
             includeTotalCount: true,
             filter: searchQuery.filters.length > 0 ? searchQuery.filters.join(' and ') : undefined,
